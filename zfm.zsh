@@ -46,6 +46,29 @@ function __zfm_decorate()
     done
 }
 
+function __zfm_decorate_all()
+{
+    while IFS= read -r line
+    do
+        if [ ! -z "$line" ];then
+            if [ -d "$line" ]; then
+                printf '%s\t[d]\n' "$line"
+            elif [ -f "$line" ]; then
+                printf '%s\t[f]\n' "$line"
+            else
+                printf '%s\t[?]\n' "$line"
+            fi
+        fi
+    done
+}
+
+function __zfm_select_bookmarks_all()
+{
+    setopt localoptions pipefail no_aliases 2> /dev/null
+    local opts="--reverse --exact --no-sort --cycle --height ${FZF_TMUX_HEIGHT:-40%} $FZF_DEFAULT_OPTS"
+    __zfm_decorate_all | FZF_DEFAULT_OPTS="$@ ${opts}" fzf --with-nth=1 --delimiter=$'\t' | cut -f1
+}
+
 function __zfm_filter_non_existent()
 {
     while IFS= read -r line
@@ -86,6 +109,46 @@ function __zfm_add_items_to_file()
     echo "$contents" | awk '!a[$0]++' > "$1"
 }
 
+function __zfm_delete_items_from_file()
+{
+    local file="$1"
+    shift
+    local delete_items=()
+    local not_found=()
+    for var in "$@"
+    do
+        local item=${var:A}
+        if grep -qxF "$item" "$file"; then
+            delete_items+=("$item")
+        else
+            not_found+=("$item")
+        fi
+    done
+    for item in "${not_found[@]}"; do
+        echo "$item" is not bookmarked!
+    done
+    if (( ${#delete_items[@]} > 0 )); then
+        local pattern_file=$(mktemp /tmp/zfm-del-XXXXXX)
+        local tmpfile=$(mktemp "${file}.XXXXXX")
+        printf '%s\n' "${delete_items[@]}" > "$pattern_file"
+        grep -vxFf "$pattern_file" "$file" > "$tmpfile"
+        local grep_ret=$?
+        if [[ $grep_ret -le 1 ]]; then
+            # exit 0 = some lines remain, exit 1 = all deleted (empty result)
+            mv "$tmpfile" "$file"
+        else
+            echo "Error updating bookmarks file"
+            rm -f "$tmpfile"
+            rm -f "$pattern_file"
+            return 1
+        fi
+        rm -f "$pattern_file"
+        for item in "${delete_items[@]}"; do
+            echo "$item" deleted!
+        done
+    fi
+}
+
 function __zfm_cleanup()
 {
     local old_length=$(wc -l < "$1")
@@ -101,6 +164,7 @@ commands:
 
 list [--files] [--dirs]                 list bookmarks
 add <path> [paths...]                   bookmark items
+delete [--multi] [<path>...]            delete bookmark(s) interactively or by path
 select [--files] [--dirs] [--multi]     select bookmark(s) and print selection to sdtout
 query <pattern>                         Query bookmark matching <pattern> and print match to stdout. Selection menu will open if match is ambiguous.
 edit                                    edit bookmarks file
@@ -170,6 +234,38 @@ function zfm()
         add)
             echo "Added to: $bookmarks_file"
             __zfm_add_items_to_file "$bookmarks_file" "${@:2}" || return 1
+            ;;
+        delete)
+            local args=("${@:2}")
+            local paths=()
+            local multi=""
+            for arg in "${args[@]}"; do
+                if [[ "$arg" == -* ]]; then
+                    if [[ "$arg" != "--multi" ]]; then
+                        echo "Invalid Argument for command delete: '${arg}'"
+                        return 1
+                    fi
+                    multi="-m"
+                else
+                    paths+=("$arg")
+                fi
+            done
+            if (( ${#paths[@]} > 0 )); then
+                __zfm_delete_items_from_file "$bookmarks_file" "${paths[@]}"
+            else
+                local selection
+                selection=$(cat "$bookmarks_file" | __zfm_select_bookmarks_all "${multi}")
+                if [[ -z "$selection" ]]; then
+                    return 0
+                fi
+                local items=()
+                local line
+                while IFS= read -r line; do
+                    [[ -z "$line" ]] && continue
+                    items+=("$line")
+                done <<< "$selection"
+                __zfm_delete_items_from_file "$bookmarks_file" "${items[@]}"
+            fi
             ;;
         query)
             if [[ "$2" == "--files" ]]; then

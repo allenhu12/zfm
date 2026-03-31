@@ -57,6 +57,26 @@ source ~/.zsh/zfm/zfm.zsh
 $ zfm add ~/Downloads ~/Documents/wallpaper.png
 ```
 
+## Delete bookmarks
+
+Delete specific bookmarks by path:
+
+```sh
+$ zfm delete ~/Downloads ~/Documents/wallpaper.png
+```
+
+Or interactively select a bookmark to delete:
+
+```sh
+$ zfm delete
+```
+
+Use `--multi` to select multiple bookmarks for deletion:
+
+```sh
+$ zfm delete --multi
+```
+
 ## List bookmarks
 
 ```sh
@@ -151,6 +171,7 @@ This will open your bookmarks in a text editor (as defined by `EDITOR`) and let 
 | --- | --- | ---
 | `zfm list` | List bookmarks | `--files`, `--dirs`
 | `zfm add <path> [<path>...]` | Add a bookmark. |
+| `zfm delete [<path>...]` | Delete bookmark(s) interactively or by path. | `--multi`
 | `zfm select` | Open selection menu with all bookmarks and print selection to stdout. | `--files`, `--dirs`, `--multi`
 | `zfm query <pattern>` | Print bookmark matching `pattern` to stdout. Selection menu will open if match is ambiguous. | `--files`, `--dirs`
 | `zfm edit` | Open and edit the bookmarks file |
@@ -164,7 +185,7 @@ This will open your bookmarks in a text editor (as defined by `EDITOR`) and let 
 | --- | --- | --- |
 | `--files` | Restrict to just files | `query`, `list`, `select` |
 | `--dirs` | Restrict to just dirs | `query`, `list`, `select` |
-| `--multi` | Allow selecting multiple items | `select` |
+| `--multi` | Allow selecting multiple items | `select`, `delete` |
 
 # Key Bindings
 
